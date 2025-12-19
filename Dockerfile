@@ -20,6 +20,13 @@ RUN mkdir -p /root/.cache/huggingface/transformers && mkdir -p /root/.cache/torc
 COPY models /app/models
 COPY app.py /app/app.py
 
+# Unpack language models
+RUN unzip /app/models/en/model.zip -d /app/models/en && rm /app/models/en/model.zip
+RUN unzip /app/models/nl/model.zip -d /app/models/nl && rm /app/models/nl/model.zip
+RUN unzip /app/models/sv/model.zip -d /app/models/sv && rm /app/models/sv/model.zip
+RUN unzip /app/models/es/model.zip -d /app/models/es && rm /app/models/es/model.zip
+RUN unzip /app/models/fi/model.zip -d /app/models/fi && rm /app/models/fi/model.zip
+
 # Mount audio directory at runtime
 VOLUME /app/audio
 

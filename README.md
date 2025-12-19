@@ -93,6 +93,19 @@ vosk-asr/
 
 ## Setup & Local Testing
 
+### Git LFS (required for models)
+
+```bash
+brew install git-lfs
+git lfs install
+git clone <repository-url>
+cd vosk-asr
+# If you cloned before installing LFS, run this to fetch the model pointers:
+git lfs pull
+```
+
+GitHub enforces a 100 MB per-file limit; model zips are stored via Git LFS pointers.
+
 ### 1. Clone Repository
 
 ```bash

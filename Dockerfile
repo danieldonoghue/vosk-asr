@@ -10,7 +10,11 @@ WORKDIR /app
 
 # Copy requirements and install Python packages
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Prepare transformer and torch caches
+RUN mkdir -p /root/.cache/huggingface/transformers && mkdir -p /root/.cache/torch
 
 # Copy models and app
 COPY models /app/models

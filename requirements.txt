@@ -3,5 +3,6 @@ soundfile
 transformers
 torch
 torchaudio
+torchcodec
 numpy
 

@@ -8,13 +8,27 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import torch
 import torchaudio
 
-# Colour codes for terminal output
-GREEN = "\033[92m"
-RED = "\033[91m"
-RESET = "\033[0m"
+# -----------------------------
+# Terminal color codes
+# -----------------------------
+class Colors:
+    EN = "\033[1;34m"   # Blue
+    ES = "\033[1;32m"   # Green
+    NL = "\033[1;36m"   # Cyan
+    SV = "\033[1;35m"   # Magenta
+    FI = "\033[1;33m"   # Yellow
+    RESET = "\033[0m"
+
+COLOR_MAP = {
+    "en": Colors.EN,
+    "es": Colors.ES,
+    "nl": Colors.NL,
+    "sv": Colors.SV,
+    "fi": Colors.FI
+}
 
 # -----------------------------
-# Model paths
+# Folder paths for all language models
 # -----------------------------
 LANGUAGE_MODELS = {
     "en": "models/en/vosk-model-small-en-us-0.15",
@@ -24,44 +38,40 @@ LANGUAGE_MODELS = {
     "fi": "models/fi"  # Wav2Vec2 Finnish model
 }
 
-# Custom dictionary / vocabulary (optional, boosts recognition)
+# Example custom dictionary / vocabulary
 MEDICINES = ["aspirin", "ibuprofen", "metformin", "paracetamol"]
 
 # -----------------------------
-# Load Vosk models
+# Load all Vosk models
 # -----------------------------
 print("Loading Vosk models...")
-vosk_models = {}
-for lang, path in LANGUAGE_MODELS.items():
-    if lang != "fi":
-        vosk_models[lang] = VoskModel(path)
+vosk_models = {lang: VoskModel(path) for lang, path in LANGUAGE_MODELS.items() if lang != "fi"}
 print("Vosk models loaded.")
 
 # -----------------------------
-# Load Finnish Wav2Vec2
+# Load Finnish Wav2Vec2 model
 # -----------------------------
 print("Loading Finnish Wav2Vec2 model...")
-try:
-    processor_fi = Wav2Vec2Processor.from_pretrained(LANGUAGE_MODELS["fi"])
-    model_fi = Wav2Vec2ForCTC.from_pretrained(LANGUAGE_MODELS["fi"])
-    model_fi.eval()
-    FI_LOADED = True
-    print("Finnish model loaded.")
-except Exception as e:
-    FI_LOADED = False
-    print(f"{RED}Warning: Finnish model failed to load: {e}{RESET}")
+processor_fi = Wav2Vec2Processor.from_pretrained(LANGUAGE_MODELS["fi"])
+model_fi = Wav2Vec2ForCTC.from_pretrained(LANGUAGE_MODELS["fi"])
+model_fi.eval()  # inference mode
+print("Finnish model loaded.")
 
 # -----------------------------
-# Vosk transcription
+# Vosk transcription function
 # -----------------------------
-def transcribe_vosk(lang, filepath):
+def transcribe_vosk(lang, filepath, custom_words=None):
     model = vosk_models[lang]
     wf = wave.open(filepath, "rb")
     rec = KaldiRecognizer(model, wf.getframerate())
 
-    # Boost custom words if present
-    if MEDICINES:
-        rec.SetGrammar(json.dumps(MEDICINES))
+    # Merge custom words with model (runtime grammar)
+    if custom_words:
+        try:
+            rec.SetWords(custom_words)
+        except Exception:
+            # fallback for older Vosk models
+            rec.SetGrammar(json.dumps(custom_words))
 
     while True:
         data = wf.readframes(4000)
@@ -73,22 +83,21 @@ def transcribe_vosk(lang, filepath):
     return result_json.get("text", "")
 
 # -----------------------------
-# Finnish transcription
+# Finnish transcription function
 # -----------------------------
 def transcribe_finnish(filepath):
-    if not FI_LOADED:
-        return f"{RED}Finnish model not loaded{RESET}"
-
     waveform, sr = torchaudio.load(filepath)
+    
+    # Convert to 16kHz mono if needed
     if sr != 16000:
         waveform = torchaudio.functional.resample(waveform, sr, 16000)
-
+    
     input_values = processor_fi(
         waveform.squeeze().numpy(),
         return_tensors="pt",
         sampling_rate=16000
     ).input_values
-
+    
     with torch.no_grad():
         logits = model_fi(input_values).logits
     predicted_ids = torch.argmax(logits, dim=-1)
@@ -96,12 +105,12 @@ def transcribe_finnish(filepath):
     return transcription.lower()
 
 # -----------------------------
-# Main loop
+# Main function
 # -----------------------------
 def main():
-    audio_dir = "/app/audio"
+    audio_dir = "/app/audio"  # mounted folder in Docker
     if not os.path.exists(audio_dir):
-        print(f"{RED}Audio directory {audio_dir} does not exist{RESET}")
+        print(f"Audio directory {audio_dir} does not exist.")
         return
 
     for file in os.listdir(audio_dir):
@@ -109,23 +118,21 @@ def main():
             continue
 
         filepath = os.path.join(audio_dir, file)
-        lang = file.split("_")[0]
+        lang = file.split("_")[0]  # e.g., en_test.wav, fi_test.wav
 
-        print(f"Processing {file} ({lang})")
+        color = COLOR_MAP.get(lang, Colors.RESET)
+        print(f"{color}Processing {file} ({lang})...{Colors.RESET}")
+
         try:
             if lang == "fi":
                 text = transcribe_finnish(filepath)
             else:
-                text = transcribe_vosk(lang, filepath)
-
-            # Colour-coded output
-            if text.strip():
-                print(f"[{lang}] Transcription: {GREEN}{text}{RESET}")
-            else:
-                print(f"[{lang}] Transcription: {RED}<empty>{RESET}")
-
+                text = transcribe_vosk(filepath=filepath, lang=lang, custom_words=MEDICINES)
+            
+            # Print color-coded transcription
+            print(f"{color}[{lang}] Transcription: {text}{Colors.RESET}\n")
         except Exception as e:
-            print(f"{RED}Error processing {file}: {e}{RESET}")
+            print(f"{color}Error processing {file}: {e}{Colors.RESET}\n")
 
 # -----------------------------
 # Entry point

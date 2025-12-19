@@ -2,7 +2,8 @@ FROM python:3.11-slim
 
 # Install OS dependencies
 RUN apt-get update && apt-get install -y \
-    wget unzip sox git && \
+    wget unzip sox git \
+    libsndfile1 libatomic1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Set workdir

@@ -7,6 +7,7 @@ from vosk import Model as VoskModel, KaldiRecognizer
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import torch
 import torchaudio
+import soundfile as sf
 
 # -----------------------------
 # Terminal color codes
@@ -86,14 +87,20 @@ def transcribe_vosk(lang, filepath, custom_words=None):
 # Finnish transcription function
 # -----------------------------
 def transcribe_finnish(filepath):
-    waveform, sr = torchaudio.load(filepath)
+    # Use soundfile to avoid torchcodec dependency issues
+    waveform, sr = sf.read(filepath, dtype='float32')
     
-    # Convert to 16kHz mono if needed
+    # Convert to mono if stereo
+    if len(waveform.shape) > 1:
+        waveform = waveform.mean(axis=1)
+    
+    # Convert to 16kHz if needed
     if sr != 16000:
-        waveform = torchaudio.functional.resample(waveform, sr, 16000)
+        import librosa
+        waveform = librosa.resample(waveform, orig_sr=sr, target_sr=16000)
     
     input_values = processor_fi(
-        waveform.squeeze().numpy(),
+        waveform,
         return_tensors="pt",
         sampling_rate=16000
     ).input_values

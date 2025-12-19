@@ -27,6 +27,7 @@ RUN unzip /app/models/nl/model.zip -d /app/models/nl && rm /app/models/nl/model.
 RUN unzip /app/models/sv/model.zip -d /app/models/sv && rm /app/models/sv/model.zip
 RUN unzip /app/models/es/model.zip -d /app/models/es && rm /app/models/es/model.zip
 RUN unzip /app/models/fi/model.zip -d /app/models/fi && rm /app/models/fi/model.zip
+RUN find /app/models
 
 # Mount audio directory at runtime
 VOLUME /app/audio
